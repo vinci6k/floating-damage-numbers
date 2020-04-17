@@ -2,27 +2,33 @@
 
 # Source.Python
 import memory
-from events import Event
 from entities import CheckTransmitInfo
-from entities.hooks import EntityCondition, EntityPreHook
 from entities.helpers import index_from_pointer
-from players.helpers import userid_from_edict
+from entities.hooks import EntityCondition, EntityPreHook
+from events import Event
 from listeners import OnLevelEnd
+from players.helpers import userid_from_edict
 
 # Floating Damage Numbers
 from .core.colors import WHITE, RED
-from .core.players import player_instances
+from .core.config import world_damage
 from .core.constants import FL_EDICT_ALWAYS, OFFSET_STAND, OFFSET_DUCK
 from .core.floating_number import FloatingNumber, number_instances
+from .core.players import PlayerFDN, player_instances
 
 
 is_point_worldtext = EntityCondition.equals_entity_classname(
     'point_worldtext')
 
 
+def load():
+    """Called when the plugin gets loaded."""
+    PlayerFDN.initialize_all_players()
+
+
 @EntityPreHook(is_point_worldtext, 'set_transmit')
 def pre_set_transmit(stack_data):
-    """Hide 'point_worldtext' entities that are part of FloatingNumbers for
+    """Hides 'point_worldtext' entities that are part of FloatingNumbers for
     everyone except the specified recipient.
     """
     index = index_from_pointer(stack_data[0])
@@ -47,37 +53,72 @@ def pre_set_transmit(stack_data):
 
 @Event('player_hurt')
 def player_hurt(event):
-    """Create a FloatingNumber only when a player takes damage from another 
-    player.
-    """
+    """Creates a FloatingNumber when a player takes damage."""
     userid_a = event['attacker']
     userid_v = event['userid']
     
-    # Self inflicted or world (falling, drowning) damage?
-    if userid_a in (userid_v, 0):
-        return
-
-    player_a = player_instances.from_userid(userid_a)
-    # Is the attacker a bot?
-    if 'BOT' in player_a.steamid or player_a.is_fake_client():
+    # Self inflicted damage or world damage (world_damage set to 0)?
+    if userid_a == userid_v or (userid_a == 0 and not world_damage.get_int()):
         return
 
     player_v = player_instances.from_userid(userid_v)
 
-    # Get the distance between the two players.
-    distance = player_v.origin.get_distance(player_a.origin)
     # Get the player height.
     offset = OFFSET_DUCK if player_v.is_ducked else OFFSET_STAND
+    number_origin = player_v.origin + offset
+    damage = str(event['dmg_health'])
+
+    # Was the damage caused by the world? (falling, drowning, crushing)
+    if userid_a == 0:
+        unique_data = []
+
+        for player in player_instances.values():
+            # There's no need for bots to see the FloatingNumber.
+            if 'BOT' in player.steamid or player.is_fake_client():
+               continue
+
+            # Is the player not looking at the position where the
+            # FloatingNumber is going to spawn?
+            if not player.is_in_fov(target=number_origin):
+                continue
+
+            distance = number_origin.get_distance(player.origin)
+            # Add this player's unique data to the list.
+            unique_data.append({
+                'angle': player.view_angle, 
+                'size': 10 + (4 * (distance / 200)),
+                'recipient': player.userid
+                })
+
+        # Will no one be able to see this FloatingNumber?
+        if not unique_data:
+            # Don't bother spawning it.
+            return
+
+        FloatingNumber.world_damage(
+            origin=number_origin,
+            number=damage,
+            color=WHITE,
+            unique_data=unique_data
+            )
     
-    FloatingNumber(
-        origin=player_v.origin + offset,
-        angle=player_a.view_angle,
-        number=event['dmg_health'],
-        # Change the color if it's a headshot.
-        color=RED if event['hitgroup'] == 1 else WHITE,
-        # Increase the size depending on the distance.
-        size=10 + (4 * (distance / 200)),
-        recipient=userid_a
+    # Or was it caused by another player?
+    else:
+        player_a = player_instances.from_userid(userid_a)
+        # Is the attacker a bot?
+        if 'BOT' in player_a.steamid or player_a.is_fake_client():
+            return
+
+        distance = number_origin.get_distance(player_a.origin)
+        FloatingNumber(
+            origin=number_origin,
+            number=damage,
+            # Change the color if it's a headshot.
+            color=RED if event['hitgroup'] == 1 else WHITE,
+            angle=player_a.view_angle,
+            # Increase the size depending on the distance.
+            size=10 + (4 * (distance / 200)),
+            recipient=player_a.userid
         )
 
 
