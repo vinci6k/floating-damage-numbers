@@ -68,6 +68,7 @@ class FloatingNumber:
                 angle=data['angle'], 
                 velocity=None
                 )
+
             num.state_flags = num.state_flags ^ FL_EDICT_ALWAYS
 
     def create(self, origin, number, color, angle, size, without_decoy=False):
@@ -163,7 +164,7 @@ def calculate_offset(number, size, angle=None):
     offset_y = 0.3 * size * (len(number) + 0.733)
     offset_z = size * -0.58
 
-    if angle:
+    if angle is not None:
         # Get the forward direction of the given 'angle'.
         forward = Vector()
         QAngle.get_angle_vectors(angle, forward, None, None)

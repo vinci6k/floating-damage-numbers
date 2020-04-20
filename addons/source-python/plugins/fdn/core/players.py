@@ -11,6 +11,7 @@ from players.entity import Player
 
 
 # Offset for CBaseCombatCharacter::IsInFieldOfView(const Vector &pos).
+# More information about the function: https://git.io/JfUSM
 IS_IN_FIELD_OF_VIEW_OFFSET = 273 if PLATFORM == 'windows' else 274
 
 
@@ -21,10 +22,7 @@ class PlayerFDN(Player):
         index (int): A valid player index.
         caching (bool): Check for a cached instance?
     """
-
-    def __init__(self, index, caching=True):
-        """Initializes the object."""
-        super().__init__(index, caching)
+    caching = True
 
     @staticmethod
     def initialize_all_players():

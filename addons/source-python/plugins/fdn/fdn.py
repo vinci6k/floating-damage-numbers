@@ -12,7 +12,7 @@ from players.helpers import userid_from_edict
 # Floating Damage Numbers
 from .core.colors import WHITE, RED
 from .core.config import world_damage
-from .core.constants import FL_EDICT_ALWAYS, OFFSET_STAND, OFFSET_DUCK
+from .core.constants import FL_EDICT_ALWAYS
 from .core.floating_number import FloatingNumber, number_instances
 from .core.players import PlayerFDN, player_instances
 
@@ -62,10 +62,10 @@ def player_hurt(event):
         return
 
     player_v = player_instances.from_userid(userid_v)
-
-    # Get the player height.
-    offset = OFFSET_DUCK if player_v.is_ducked else OFFSET_STAND
-    number_origin = player_v.origin + offset
+    
+    number_origin = player_v.origin
+    # Adjust the origin of the FloatingNumber according to player height.
+    number_origin.z += player_v.maxs.z + (5 * player_v.model_scale)
     damage = str(event['dmg_health'])
 
     # Was the damage caused by the world? (falling, drowning, crushing)
@@ -74,7 +74,7 @@ def player_hurt(event):
 
         for player in player_instances.values():
             # There's no need for bots to see the FloatingNumber.
-            if 'BOT' in player.steamid or player.is_fake_client():
+            if player.is_bot():
                continue
 
             # Is the player not looking at the position where the
@@ -106,7 +106,7 @@ def player_hurt(event):
     else:
         player_a = player_instances.from_userid(userid_a)
         # Is the attacker a bot?
-        if 'BOT' in player_a.steamid or player_a.is_fake_client():
+        if player_a.is_bot():
             return
 
         distance = number_origin.get_distance(player_a.origin)
