@@ -51,6 +51,12 @@ def pre_set_transmit(stack_data):
         return False
 
 
+@Event('player_activate')
+def player_activate(event):
+    """Makes sure the newly connected player gets a Player instance."""
+    player_instances.from_userid(event['userid'])
+
+
 @Event('player_hurt')
 def player_hurt(event):
     """Creates a FloatingNumber when a player takes damage."""
@@ -62,7 +68,7 @@ def player_hurt(event):
         return
 
     player_v = player_instances.from_userid(userid_v)
-    
+
     number_origin = player_v.origin
     # Adjust the origin of the FloatingNumber according to player height.
     number_origin.z += player_v.maxs.z + (5 * player_v.model_scale)

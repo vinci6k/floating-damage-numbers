@@ -63,6 +63,8 @@ class FloatingNumber:
                 origin, number, color, **data, without_decoy=True)
             # Parent it to the decoy of the first FloatingNumber.
             num.world_text.set_parent(decoy, -1)
+            # Get the proper angle for the new FloatingNumber.
+            data['angle'] = get_angle_difference(decoy.angles, data['angle'])
             # Apply the correct offset and rotation.
             num.world_text.teleport(
                 origin=calculate_offset(number, data['size'], data['angle']), 
@@ -177,3 +179,12 @@ def calculate_offset(number, size, angle=None):
     return Vector(offset_x, offset_y, offset_z)
 
 
+def get_angle_difference(angle_source, angle_target):
+    """Returns the difference between the given angles on the X (pitch) and 
+    Y (yaw) axes."""
+
+    for axis in range(0, 2):
+        angle_target[axis] = 180 - (
+            180 - angle_target[axis] + angle_source[axis]) % 360
+
+    return angle_target
