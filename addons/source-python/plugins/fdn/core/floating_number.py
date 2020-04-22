@@ -59,7 +59,8 @@ class FloatingNumber:
         # Go through all the given data.
         for data in unique_data:
             # Create a FloatingNumber without a 'decoy_projectile'.
-            num = FloatingNumber(origin, number, color, **data, no_decoy=True)
+            num = FloatingNumber(
+                origin, number, color, **data, without_decoy=True)
             # Parent it to the decoy of the first FloatingNumber.
             num.world_text.set_parent(decoy, -1)
             # Apply the correct offset and rotation.
