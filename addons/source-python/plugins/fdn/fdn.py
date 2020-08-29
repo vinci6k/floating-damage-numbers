@@ -1,7 +1,6 @@
 # ../fdn/fdn.py
 
 # Source.Python
-import memory
 from entities import CheckTransmitInfo
 from entities.helpers import index_from_pointer
 from entities.hooks import EntityCondition, EntityPreHook
@@ -33,12 +32,14 @@ def pre_set_transmit(stack_data):
     """
     index = index_from_pointer(stack_data[0])
 
-    # Is this not a FloatingNumber entity?
-    if index not in number_instances:
+    try:
+        # Does this index belong to a FloatingNumber instance?
+        floating_number = number_instances[index]
+    except KeyError:
+        # Nope, don't go further.
         return None
 
-    floating_number = number_instances[index]
-    info = memory.make_object(CheckTransmitInfo, stack_data[1])
+    info = CheckTransmitInfo._obj(stack_data[1])
     # Strip the FL_EDICT_ALWAYS flag from the 'point_worldtext'.
     floating_number.state_flags = floating_number.state_flags ^ FL_EDICT_ALWAYS
 
@@ -92,7 +93,7 @@ def player_hurt(event):
             # Add this player's unique data to the list.
             unique_data.append({
                 'angle': player.view_angle, 
-                'size': 10 + (4 * (distance / 200)),
+                'size': 10 + distance * 0.019,
                 'recipient': player.userid
                 })
 
@@ -123,7 +124,7 @@ def player_hurt(event):
             color=RED if event['hitgroup'] == 1 else WHITE,
             angle=player_a.view_angle,
             # Increase the size depending on the distance.
-            size=10 + (4 * (distance / 200)),
+            size=10 + distance * 0.019,
             recipient=player_a.userid
         )
 

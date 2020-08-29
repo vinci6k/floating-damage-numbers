@@ -145,14 +145,16 @@ def on_entity_deleted(base_entity):
     except ValueError:
         return
 
-    # Is this index tied to a FloatingNumber instance?
-    if index in number_instances:
-        del number_instances[index]
+    try:
+        # Is this index tied to a FloatingNumber instance?
+        number_instances.pop(index)
+    except KeyError:
+        pass
 
 
 def calculate_offset(number, size, angle=None):
-    """Calculates the offset for the centering the 'point_worldtext' entity on 
-    the 'decoy_projectile'.
+    """Calculates the offset for centering the 'point_worldtext' entity on the 
+    'decoy_projectile'.
     
     Args:
         number (str): Number that the 'point_worldtext' entity will display.
