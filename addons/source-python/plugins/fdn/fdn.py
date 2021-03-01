@@ -1,17 +1,21 @@
 # ../fdn/fdn.py
 
 # Source.Python
-from entities import CheckTransmitInfo
+from engines.trace import ContentMasks, GameTrace, Ray, engine_trace
+from entities import CheckTransmitInfo, TakeDamageInfo
+from entities.constants import WORLD_ENTITY_INDEX, DamageTypes
+from entities.entity import Entity
 from entities.helpers import index_from_pointer
 from entities.hooks import EntityCondition, EntityPreHook
 from events import Event
 from listeners import OnLevelEnd
+from mathlib import Vector
 from players.helpers import userid_from_edict
 
 # Floating Damage Numbers
-from .core.colors import WHITE, RED
-from .core.config import world_damage
-from .core.constants import FL_EDICT_ALWAYS
+from .core.colors import WHITE, RED, YELLOW
+from .core.config import world_damage, wall_bangs
+from .core.constants import FL_EDICT_ALWAYS, DISTANCE_MULTIPLIER
 from .core.floating_number import FloatingNumber, number_instances
 from .core.players import PlayerFDN, player_instances
 
@@ -58,31 +62,29 @@ def player_activate(event):
     player_instances.from_userid(event['userid'])
 
 
-@Event('player_hurt')
-def player_hurt(event):
+@EntityPreHook(EntityCondition.is_player, 'on_take_damage_alive')
+def on_take_damage_alive_pre(stack_data):
     """Creates a FloatingNumber when a player takes damage."""
-    userid_a = event['attacker']
-    userid_v = event['userid']
-    
-    # Self inflicted damage or world damage (world_damage set to 0)?
-    if userid_a == userid_v or (userid_a == 0 and not world_damage.get_int()):
-        return
+    # Get the Player instance of the victim.
+    player_v = player_instances[index_from_pointer(stack_data[0])]
+    # Get the CTakeDamageInfo instance.
+    info = TakeDamageInfo._obj(stack_data[1])
+    # Get the index of the entity that caused the damage.
+    index_a = info.attacker
 
-    player_v = player_instances.from_userid(userid_v)
+    # Did the player take damage from the world?
+    if index_a == 0:
+        # Are damage numbers disabled for world damage (world_damage set to 0)?
+        if not world_damage.get_int():
+            return
 
-    number_origin = player_v.origin
-    # Adjust the origin of the FloatingNumber according to player height.
-    number_origin.z += player_v.maxs.z + (5 * player_v.model_scale)
-    damage = str(event['dmg_health'])
-
-    # Was the damage caused by the world? (falling, drowning, crushing)
-    if userid_a == 0:
+        number_origin = player_v.get_number_origin()
         unique_data = []
 
         for player in player_instances.values():
             # There's no need for bots to see the FloatingNumber.
             if player.is_bot():
-               continue
+                continue
 
             # Is the player not looking at the position where the
             # FloatingNumber is going to spawn?
@@ -92,8 +94,8 @@ def player_hurt(event):
             distance = number_origin.get_distance(player.origin)
             # Add this player's unique data to the list.
             unique_data.append({
-                'angle': player.view_angle, 
-                'size': 10 + distance * 0.019,
+                'angle': player.view_angle,
+                'size': 10 + distance * DISTANCE_MULTIPLIER,
                 'recipient': player.userid
                 })
 
@@ -104,28 +106,92 @@ def player_hurt(event):
 
         FloatingNumber.world_damage(
             origin=number_origin,
-            number=damage,
+            # Since `info.damage` is a float, convert it to an integer before
+            # converting it to a string to get rid of the decimal part.
+            number=str(int(info.damage)),
             color=WHITE,
             unique_data=unique_data
             )
-    
-    # Or was it caused by another player?
+
+    # Or from a player?
     else:
-        player_a = player_instances.from_userid(userid_a)
+        try:
+            # Try to get the Player instance of the attacker.
+            player_a = player_instances[index_a]
+        except ValueError:
+            # Damage was caused indirectly (grenade, projectile).
+            try:
+                # Try to get a Player instance again, but this time using the
+                # the owner inthandle of the entity that caused the damage.
+                player_a = player_instances.from_inthandle(
+                    Entity(info.inflictor).owner_handle)
+            except (ValueError, OverflowError):
+                # ValueError: not a player.
+                # OverflowError: invalid owner inthandle (-1).
+                return
+
         # Is the attacker a bot?
         if player_a.is_bot():
             return
 
+        # Self inflicted damage?
+        if player_v is player_a:
+            return
+
+        number_origin = player_v.get_number_origin()
+        velocity = None
+
+        # Did the bullet go through another entity before hitting the player?
+        if info.penetrated and wall_bangs.get_int():
+            # Let's check if that entity is the world.
+            trace = GameTrace()
+            engine_trace.clip_ray_to_entity(
+                # Create a Ray() from the attacker's eyes to the hit position.
+                Ray(player_a.eye_location, info.position),
+                ContentMasks.ALL,
+                Entity(WORLD_ENTITY_INDEX),
+                trace
+            )
+
+            # Is this an actual wall-bang (bullet went through world)?
+            if trace.did_hit():
+                # Calculate the directional vector from the wall to the player.
+                from_wall = trace.start_position - trace.end_position
+                # Calculate the offset for the FloatingNumber's new origin.
+                origin_offset = 10 + from_wall.length * 0.01
+                # Normalize it.
+                # Vector(368.52, 40.71, -7.77) -> Vector(0.99, 0.10, -0.02)
+                from_wall.normalize()
+                # Change the origin of the FloatingNumber so it spawns in front
+                # of the wall where the wall-bang took place.
+                number_origin = trace.end_position + origin_offset * from_wall
+
+                right, up = Vector(), Vector()
+                from_wall.get_vector_vectors(right, up)
+
+                velocity = from_wall * 25 + (
+                    right * 35 * player_a.next_direction)
+                # If the bullet went through something else (another player)
+                # before hitting the wall, adjust how high the FloatingNumber
+                # gets pushed.
+                velocity.z = 75 * info.penetrated
+
         distance = number_origin.get_distance(player_a.origin)
+        # TODO: Figure out a better way to allow other plugins to change the
+        # color of the FloatingNumber. Or hardcode the colors to unused
+        # DamageTypes (e.g. AIRBOAT = YELLOW, PHYSGUN = BLUE)?
+        color = YELLOW if info.type == DamageTypes.AIRBOAT else WHITE
+
         FloatingNumber(
             origin=number_origin,
-            number=damage,
+            number=str(int(info.damage)),
             # Change the color if it's a headshot.
-            color=RED if event['hitgroup'] == 1 else WHITE,
+            color=RED if player_v.last_hitgroup == 1 else color,
             angle=player_a.view_angle,
             # Increase the size depending on the distance.
-            size=10 + distance * 0.019,
-            recipient=player_a.userid
+            size=10 + distance * DISTANCE_MULTIPLIER,
+            recipient=player_a.userid,
+            velocity=velocity
         )
 
 

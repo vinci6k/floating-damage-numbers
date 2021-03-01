@@ -7,7 +7,7 @@ import random
 from entities.constants import SolidType, SolidFlags, CollisionGroup
 from entities.entity import Entity
 from listeners import OnEntityDeleted
-from mathlib import Vector, QAngle
+from mathlib import Vector
 
 # Floating Damage Numbers
 from .colors import INVISIBLE
@@ -21,7 +21,7 @@ number_instances = {}
 
 class FloatingNumber:
     """Class used to create a 'point_worldtext' entity with movement.
-    
+
     Args:
         origin (Vector): Position of the FloatingNumber.
         number (str): Number that the 'point_worldtext' entity will display.
@@ -37,7 +37,9 @@ class FloatingNumber:
         decoy (Entity): Instance of the 'decoy_projectile' entity.
     """
 
-    def __init__(self, origin, number, color, angle, size, recipient, **kwargs):
+    def __init__(
+        self, origin, number, color, angle, size, recipient, **kwargs
+    ):
         """Initializes the object."""
         self.recipient = recipient
         self.world_text = None
@@ -45,7 +47,10 @@ class FloatingNumber:
 
         self.create(
             origin, number, color, angle, int(size),
-            kwargs.get('without_decoy', False)
+            # Should the FloatingNumber spawn without a 'decoy_projectile'?
+            kwargs.get('without_decoy', False),
+            # Are we trying to override the random velocity?
+            kwargs.get('velocity', None)
             )
 
     @classmethod
@@ -74,7 +79,10 @@ class FloatingNumber:
 
             num.state_flags = num.state_flags ^ FL_EDICT_ALWAYS
 
-    def create(self, origin, number, color, angle, size, without_decoy=False):
+    def create(
+        self, origin, number, color, angle, size, without_decoy=False, 
+        velocity=None
+    ):
         """Creates and combines a 'decoy_projectile' and a 'point_worldtext' to
         represent the FloatingNumber entity.
 
@@ -114,18 +122,18 @@ class FloatingNumber:
         self.state_flags = self.state_flags ^ FL_EDICT_ALWAYS
 
         self.decoy.teleport(
-            origin, 
-            angle, 
-            Vector(
-                random.choice(random_velocity), 
-                random.choice(random_velocity), 
+            origin,
+            angle,
+            velocity if velocity else Vector(
+                random.choice(random_velocity),
+                random.choice(random_velocity),
                 65
                 )
             )
         # Remove the 'decoy_projectile' after a short delay.
         # Since the 'point_worldtext' is parented to the 'decoy_projectile', it
         # will also get removed.
-        self.decoy.delay(0.5, self.decoy.remove)
+        self.decoy.delay(0.55, self.decoy.remove)
 
     def get_state_flags(self):
         """Shortcut for getting the edict flags of the 'point_worldtext'."""
@@ -155,12 +163,12 @@ def on_entity_deleted(base_entity):
 def calculate_offset(number, size, angle=None):
     """Calculates the offset for centering the 'point_worldtext' entity on the 
     'decoy_projectile'.
-    
+
     Args:
         number (str): Number that the 'point_worldtext' entity will display.
         size (int): Size of the number.
         angle (QAngle): Angle of the number.
-        
+
     Returns:
         Vector: Offset for centering the 'point_worldtext' entity on a
             'decoy_projectile' based on the given arguments.
@@ -172,7 +180,7 @@ def calculate_offset(number, size, angle=None):
     if angle is not None:
         # Get the forward direction of the given 'angle'.
         forward = Vector()
-        QAngle.get_angle_vectors(angle, forward, None, None)
+        angle.get_angle_vectors(forward)
 
         # Adjust the offsets.
         offset_x = offset_y * -forward[1]

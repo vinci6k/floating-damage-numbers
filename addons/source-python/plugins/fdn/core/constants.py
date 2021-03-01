@@ -11,3 +11,5 @@ __all__ = (
 # SetTransmit hook will not work.
 FL_EDICT_ALWAYS = 1<<3
 
+
+DISTANCE_MULTIPLIER = 0.019
