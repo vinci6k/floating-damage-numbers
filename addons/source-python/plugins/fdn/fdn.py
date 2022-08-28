@@ -118,16 +118,15 @@ def on_take_damage_alive_pre(stack_data):
         try:
             # Try to get the Player instance of the attacker.
             player_a = player_instances[index_a]
-        except ValueError:
+        except KeyError:
             # Damage was caused indirectly (grenade, projectile).
             try:
                 # Try to get a Player instance again, but this time using the
                 # the owner inthandle of the entity that caused the damage.
                 player_a = player_instances.from_inthandle(
                     Entity(info.inflictor).owner_handle)
-            except (ValueError, OverflowError):
-                # ValueError: not a player.
-                # OverflowError: invalid owner inthandle (-1).
+            except KeyError:
+                # KeyError: not a player or invalid owner inthandle (-1).
                 return
 
         # Is the attacker a bot?
