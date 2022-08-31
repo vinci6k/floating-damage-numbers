@@ -1,7 +1,7 @@
 # Floating Damage Numbers
 This plugin adds damage numbers commonly seen in RPG games to your server.
 
-[<img src="https://media.giphy.com/media/uTLVAlHMwSUCvzXLgw/giphy.gif" width="416px"/>](https://youtu.be/fkufbH8tjX0 "Normal Hits") [<img src="https://media.giphy.com/media/vxNww5CswTtHgqIrGX/giphy.gif" width="416px"/>](https://youtu.be/i8bNqMnmyXU "Headshot")
+[<img src="https://media.giphy.com/media/uTLVAlHMwSUCvzXLgw/giphy.gif" width="412px"/>](https://youtu.be/fkufbH8tjX0 "Normal Hits") [<img src="https://media.giphy.com/media/vxNww5CswTtHgqIrGX/giphy.gif" width="412px"/>](https://youtu.be/i8bNqMnmyXU "Headshot")
 
 ## Installation
 1. [Install Source.Python](http://wiki.sourcepython.com/general/installation.html).
